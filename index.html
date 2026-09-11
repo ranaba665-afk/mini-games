@@ -2842,4 +2842,209 @@ function spaceLoop(){
         sfxPop();
       }
     }
-    if(!en.dead && en.x < s.ship.x+s.ship.size && en.x+en.size > s.ship.x && en.y < s.ship.y+s.ship.siz
+    if(!en.dead && en.x < s.ship.x+s.ship.size && en.x+en.size > s.ship.x && en.y < s.ship.y+s.ship.size && en.y+en.size > s.ship.y){
+      en.dead = true;
+      s.lives--;
+      sfxError();
+      document.getElementById('spaceLives').textContent = s.lives;
+    }
+    if(en.y > s.h && !en.dead) en.dead = true;
+  }
+  s.enemies = s.enemies.filter(en=>!en.dead);
+  s.bullets = s.bullets.filter(b=>!b.dead);
+  document.getElementById('spaceScore').textContent = s.score;
+  if(s.lives <= 0){ if(!s.over) sfxLose(); s.over = true; }
+  drawSpace();
+  if(s.over){
+    setTimeout(()=> goToResult('spaceshooter', s.score, 'Enemies destroyed.'), 400);
+    return;
+  }
+  loopIds.spaceRAF = requestAnimationFrame(spaceLoop);
+}
+function drawSpace(){
+  const s = spaceState;
+  spaceCtx.fillStyle = '#0d0b16';
+  spaceCtx.fillRect(0,0,s.w,s.h);
+  spaceCtx.fillStyle = '#ffb84c';
+  s.bullets.forEach(b=> spaceCtx.fillRect(b.x, b.y, 4, 10));
+  spaceCtx.fillStyle = '#ff5f9e';
+  s.enemies.forEach(en=> spaceCtx.fillRect(en.x, en.y, en.size, en.size));
+  spaceCtx.fillStyle = '#3fe8b0';
+  spaceCtx.fillRect(s.ship.x, s.ship.y, s.ship.size, s.ship.size);
+  if(!s.started){
+    spaceCtx.fillStyle = '#9a90bd';
+    spaceCtx.font = '14px Inter';
+    spaceCtx.fillText('Tap to start', s.w/2-40, s.h/2);
+  }
+}
+
+/* ---------- ROCKET DODGE ---------- */
+let rocketCtx, rocketCanvas, rocketState;
+function startRocketDodge(){
+  rocketCanvas = document.getElementById('rocketCanvas');
+  rocketCanvas.width = rocketCanvas.clientWidth*2;
+  rocketCanvas.height = 340*2;
+  rocketCtx = rocketCanvas.getContext('2d');
+  rocketCtx.scale(2,2);
+  const w = rocketCanvas.clientWidth, h = 340;
+  rocketState = { w,h, rocket:{x:w/2-14,size:28}, asteroids:[], speed:2.4, spawnTimer:40, score:0, over:false, started:false };
+  drawRocket();
+  rocketCanvas.onpointerdown = ()=>{ if(!rocketState.started){ rocketState.started = true; rocketLoop(); } };
+  rocketCanvas.onpointermove = (e)=>{
+    const rect = rocketCanvas.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    rocketState.rocket.x = Math.max(0, Math.min(w - rocketState.rocket.size, x - rocketState.rocket.size/2));
+  };
+}
+function rocketLoop(){
+  const s = rocketState;
+  if(s.over) return;
+  s.spawnTimer--;
+  if(s.spawnTimer <= 0){
+    s.asteroids.push({x:Math.random()*(s.w-22), y:-22, size:18+Math.random()*14});
+    s.spawnTimer = 32 - Math.min(18, Math.floor(s.score/150));
+  }
+  s.asteroids.forEach(a=> a.y += s.speed);
+  s.asteroids = s.asteroids.filter(a=> a.y < s.h+30);
+  s.score += 1;
+  s.speed = 2.4 + Math.floor(s.score/250)*0.5;
+  const ry = s.h - 60;
+  for(const a of s.asteroids){
+    if(a.x < s.rocket.x+s.rocket.size && a.x+a.size > s.rocket.x && a.y < ry+s.rocket.size && a.y+a.size > ry){
+      if(!s.over) sfxLose();
+      s.over = true;
+    }
+  }
+  document.getElementById('rocketScore').textContent = Math.floor(s.score/10);
+  drawRocket();
+  if(s.over){
+    setTimeout(()=> goToResult('rocketdodge', Math.floor(s.score/10), 'Asteroid field survived.'), 400);
+    return;
+  }
+  loopIds.rocketRAF = requestAnimationFrame(rocketLoop);
+}
+function drawRocket(){
+  const s = rocketState;
+  rocketCtx.fillStyle = '#0d0b16';
+  rocketCtx.fillRect(0,0,s.w,s.h);
+  rocketCtx.fillStyle = '#9a90bd';
+  s.asteroids.forEach(a=>{
+    rocketCtx.beginPath();
+    rocketCtx.arc(a.x+a.size/2, a.y+a.size/2, a.size/2, 0, Math.PI*2);
+    rocketCtx.fill();
+  });
+  rocketCtx.fillStyle = '#5aa9ff';
+  rocketCtx.fillRect(s.rocket.x, s.h-60, s.rocket.size, s.rocket.size);
+  if(!s.started){
+    rocketCtx.fillStyle = '#9a90bd';
+    rocketCtx.font = '14px Inter';
+    rocketCtx.fillText('Tap to start', s.w/2-40, s.h/2);
+  }
+}
+
+/* ---------- global key handler ---------- */
+document.addEventListener('keydown', (e)=>{
+  const active = document.querySelector('.view.active');
+  if(!active) return;
+  const id = active.id;
+  if(e.key === 'Enter'){
+    if(id === 'view-guess') submitGuess();
+    if(id === 'view-wordscramble') submitScramble();
+    if(id === 'view-quickmath') submitMath();
+  }
+  if(id === 'view-runner' && e.code === 'Space'){ e.preventDefault(); runnerKeyHandler(); }
+  if(id === 'view-flappy' && e.code === 'Space'){ e.preventDefault(); flappyKeyHandler(); }
+  if(id === 'view-g2048'){
+    if(e.key==='ArrowLeft'){ e.preventDefault(); move2048('left'); }
+    if(e.key==='ArrowRight'){ e.preventDefault(); move2048('right'); }
+    if(e.key==='ArrowUp'){ e.preventDefault(); move2048('up'); }
+    if(e.key==='ArrowDown'){ e.preventDefault(); move2048('down'); }
+  }
+  if(id === 'view-snake'){
+    if(e.key==='ArrowLeft'){ e.preventDefault(); setSnakeDir({x:-1,y:0}); }
+    if(e.key==='ArrowRight'){ e.preventDefault(); setSnakeDir({x:1,y:0}); }
+    if(e.key==='ArrowUp'){ e.preventDefault(); setSnakeDir({x:0,y:-1}); }
+    if(e.key==='ArrowDown'){ e.preventDefault(); setSnakeDir({x:0,y:1}); }
+  }
+});
+
+/* ---------- TIC TAC TOE ---------- */
+let tttBoard = Array(9).fill(null);
+let tttOver = false;
+let tttStats = {wins:0, draws:0, losses:0};
+function startTTT(){
+  tttBoard = Array(9).fill(null);
+  tttOver = false;
+  document.getElementById('tttStatus').textContent = 'Your move';
+  renderTTT();
+}
+function renderTTT(){
+  const el = document.getElementById('tttBoard');
+  el.innerHTML = '';
+  tttBoard.forEach((v,i)=>{
+    const c = document.createElement('div');
+    c.className = 'ttc' + (v==='X'?' x':'') + (v==='O'?' o':'');
+    c.textContent = v==='X'?'✕':(v==='O'?'○':'');
+    c.onclick = ()=> tttMove(i);
+    el.appendChild(c);
+  });
+  document.getElementById('tttWins').textContent = tttStats.wins;
+  document.getElementById('tttDraws').textContent = tttStats.draws;
+  document.getElementById('tttLosses').textContent = tttStats.losses;
+}
+const TTT_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function tttWinner(b){
+  for(const [a,c,d] of TTT_LINES){
+    if(b[a] && b[a]===b[c] && b[a]===b[d]) return b[a];
+  }
+  return b.every(x=>x) ? 'draw' : null;
+}
+function tttMove(i){
+  if(tttOver || tttBoard[i]) return;
+  tttBoard[i] = 'X';
+  sfxClick();
+  renderTTT();
+  let w = tttWinner(tttBoard);
+  if(w){ return tttEnd(w); }
+  setTimeout(()=>{
+    const move = tttBestMove(tttBoard);
+    if(move !== -1){
+      tttBoard[move] = 'O';
+      sfxBlip(280);
+      renderTTT();
+      w = tttWinner(tttBoard);
+      if(w){ return tttEnd(w); }
+    }
+  }, 350);
+}
+function tttBestMove(b){
+  const empty = b.map((v,i)=>v?null:i).filter(i=>i!==null);
+  if(empty.length === 0) return -1;
+  // try win
+  for(const i of empty){ b[i]='O'; if(tttWinner(b)==='O'){ b[i]=null; return i;} b[i]=null; }
+  // block
+  for(const i of empty){ b[i]='X'; if(tttWinner(b)==='X'){ b[i]=null; return i;} b[i]=null; }
+  // center
+  if(!b[4]) return 4;
+  // corner
+  const corners = [0,2,6,8].filter(i=>!b[i]);
+  if(corners.length) return corners[Math.floor(Math.random()*corners.length)];
+  return empty[Math.floor(Math.random()*empty.length)];
+}
+function tttEnd(w){
+  tttOver = true;
+  if(w==='X'){ tttStats.wins++; sfxWin(); document.getElementById('tttStatus').textContent = 'You win! 🎉'; }
+  else if(w==='O'){ tttStats.losses++; sfxLose(); document.getElementById('tttStatus').textContent = 'Computer wins.'; }
+  else { tttStats.draws++; sfxBlip(440); document.getElementById('tttStatus').textContent = "It's a draw."; }
+  renderTTT();
+  const score = w==='X' ? 100 : (w==='draw' ? 50 : 0);
+  setTimeout(()=> goToResult('ttt', score, w==='X' ? 'Victory against the computer.' : (w==='draw' ? 'A hard-fought draw.' : 'Better luck next round.')), 600);
+}
+
+/* ---------- init ---------- */
+loadName().then(refreshBests);
+loadSoundPref();
+</script>
+</body>
+</html>
+
